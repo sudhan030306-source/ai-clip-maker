@@ -12,7 +12,6 @@ export default async function HomePage() {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
-
   if (session) {
     redirect('/dashboard')
   } else {
