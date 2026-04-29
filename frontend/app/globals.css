@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Poppins:wght@700;800&family=Bebas+Neue&family=Anton&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #0ea5e9;
+  --brand-glow: rgba(14, 165, 233, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0f;
+  color: #f0f0f0;
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #12121a; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* Score ring animation */
+@keyframes score-ring {
+  from { stroke-dashoffset: 283; }
+}
+
+/* Caption overlay fonts */
+.caption-montserrat { font-family: 'Montserrat', sans-serif; font-weight: 800; }
+.caption-poppins     { font-family: 'Poppins', sans-serif;     font-weight: 700; }
+.caption-bebas       { font-family: 'Bebas Neue', sans-serif;  font-weight: 400; }
+.caption-anton       { font-family: 'Anton', sans-serif;       font-weight: 400; }
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #0ea5e9, #a855f7, #ec4899);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient 6s ease infinite;
+}
+
+@keyframes gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+/* Glass card */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+/* Glow border on hover */
+.glow-hover:hover {
+  border-color: rgba(14, 165, 233, 0.5);
+  box-shadow: 0 0 20px var(--brand-glow);
+}
+
+/* Processing animation */
+@keyframes processing-bar {
+  0%   { width: 0%; }
+  20%  { width: 25%; }
+  40%  { width: 50%; }
+  70%  { width: 75%; }
+  90%  { width: 90%; }
+  100% { width: 95%; }
+}
+.processing-bar {
+  animation: processing-bar 30s ease-out forwards;
+}

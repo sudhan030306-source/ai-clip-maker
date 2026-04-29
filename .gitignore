@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.npm
+
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+backend/.env
+frontend/.env.local
+
+# Next.js build output
+.next/
+out/
+build/
+
+# Temp and generated files — runtime only
+backend/temp/
+backend/clips/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/settings.json
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
