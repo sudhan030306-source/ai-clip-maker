@@ -7,10 +7,9 @@ cmds = [
   "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp",
   "chmod a+rx /usr/local/bin/yt-dlp",
   "mkdir -p /usr/share/fonts/custom",
-  "curl -L https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Bold.ttf -o /usr/share/fonts/custom/Montserrat-Bold.ttf",
-  "curl -L https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf -o /usr/share/fonts/custom/Poppins-Bold.ttf",
-  "curl -L https://github.com/google/fonts/raw/main/ofl/bebasneuе/BebasNeue-Regular.ttf -o /usr/share/fonts/custom/BebasNeue-Regular.ttf",
-  "curl -L https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf -o /usr/share/fonts/custom/Anton-Regular.ttf",
+  "curl -L 'https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Bold.ttf' -o /usr/share/fonts/custom/Montserrat-Bold.ttf",
+  "curl -L 'https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf' -o /usr/share/fonts/custom/Poppins-Bold.ttf",
+  "curl -L 'https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf' -o /usr/share/fonts/custom/Anton-Regular.ttf",
   "fc-cache -fv"
 ]
 
