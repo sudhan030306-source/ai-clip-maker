@@ -1,8 +1,10 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "fontconfig"]
+nixPkgs = ["ffmpeg", "python3", "fontconfig"]
 
 [phases.install]
 cmds = [
+  "ln -sf $(which python3) /usr/bin/python3 || true",
+  "ln -sf $(which python3) /usr/local/bin/python3 || true",
   "npm install"
 ]
 
