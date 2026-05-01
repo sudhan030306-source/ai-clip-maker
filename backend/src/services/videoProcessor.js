@@ -1,10 +1,10 @@
 /**
  * Video Processor Service
- * Uses youtube-dl-exec (auto-downloads yt-dlp binary via npm)
+ * Uses youtube-dl-exec (npm package that bundles yt-dlp binary)
  * and FFmpeg for audio extraction and clip generation
  */
 
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const youtubeDl = require('youtube-dl-exec');
@@ -16,6 +16,32 @@ const CLIPS_DIR = path.join(__dirname, '../../clips');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// ─── Ensure python3 is accessible at /usr/bin/python3 ─────────────────────────
+// youtube-dl-exec's yt-dlp binary uses /usr/bin/env python3 as shebang
+// On Railway/Nix the python3 binary is in a different path — we fix it here
+(function ensurePython3() {
+  try {
+    execSync('/usr/bin/python3 --version', { stdio: 'pipe' });
+  } catch {
+    try {
+      const python3Path = execSync('which python3', { stdio: 'pipe' }).toString().trim();
+      if (python3Path && python3Path !== '/usr/bin/python3') {
+        try {
+          execSync(`ln -sf ${python3Path} /usr/bin/python3`, { stdio: 'pipe' });
+          console.log(`Linked python3: ${python3Path} → /usr/bin/python3`);
+        } catch (_) {
+          // If we can't symlink (permissions), try local bin
+          try {
+            execSync(`ln -sf ${python3Path} /usr/local/bin/python3`, { stdio: 'pipe' });
+          } catch (_) {}
+        }
+      }
+    } catch (_) {
+      console.warn('python3 not found — yt-dlp may fail');
+    }
+  }
+})();
+
 /**
  * Run FFmpeg as a child process
  */
@@ -24,7 +50,7 @@ function runFFmpeg(args) {
     const proc = spawn('ffmpeg', args);
     let stderr = '';
     if (proc.stderr) proc.stderr.on('data', d => (stderr += d));
-    proc.on('error', err => reject(new Error(`ffmpeg not found: ${err.message}`)));
+    proc.on('error', err => reject(new Error(`ffmpeg not found: ${err.message}. Install ffmpeg.`)));
     proc.on('close', code => {
       if (code !== 0) reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-500)}`));
       else resolve();
@@ -58,7 +84,7 @@ async function downloadAndExtractAudio(url, jobId) {
   const videoPath = path.join(TEMP_DIR, `${jobId}.mp4`);
   const audioPath = path.join(TEMP_DIR, `${jobId}.wav`);
 
-  // ── Step 1: Download video via youtube-dl-exec ─────────────────────────────
+  // ── Step 1: Download via youtube-dl-exec ──────────────────────────────────
   console.log(`[${jobId}] Downloading video...`);
   await youtubeDl(url, {
     output: videoPath,
@@ -72,7 +98,7 @@ async function downloadAndExtractAudio(url, jobId) {
     throw new Error('Video download failed — output file not found');
   }
 
-  // ── Step 2: Extract audio with FFmpeg ─────────────────────────────────────
+  // ── Step 2: Extract audio ─────────────────────────────────────────────────
   console.log(`[${jobId}] Extracting audio...`);
   await runFFmpeg([
     '-i', videoPath,
@@ -92,7 +118,7 @@ async function downloadAndExtractAudio(url, jobId) {
 }
 
 /**
- * Generate a clip with burned-in captions
+ * Generate clip with burned-in captions
  */
 async function generateClipVideo(videoPath, startTime, endTime, srtContent, font, clipId) {
   const duration = endTime - startTime;
@@ -146,7 +172,7 @@ async function generateClipVideo(videoPath, startTime, endTime, srtContent, font
       try { fs.unlinkSync(srtPath); } catch (_) {}
     }
   } else {
-    ffmpegArgs = [
+    await runFFmpeg([
       '-ss', String(startTime),
       '-i', videoPath,
       '-t', String(duration),
@@ -158,8 +184,7 @@ async function generateClipVideo(videoPath, startTime, endTime, srtContent, font
       '-movflags', '+faststart',
       '-y',
       outputPath,
-    ];
-    await runFFmpeg(ffmpegArgs);
+    ]);
   }
 
   return outputPath;
@@ -181,13 +206,15 @@ function cleanupJob(jobId) {
 
 function cleanupOldClips() {
   const cutoff = Date.now() - 48 * 60 * 60 * 1000;
-  fs.readdirSync(CLIPS_DIR).forEach(file => {
-    const filePath = path.join(CLIPS_DIR, file);
-    try {
-      const { mtimeMs } = fs.statSync(filePath);
-      if (mtimeMs < cutoff) fs.unlinkSync(filePath);
-    } catch (_) {}
-  });
+  try {
+    fs.readdirSync(CLIPS_DIR).forEach(file => {
+      const filePath = path.join(CLIPS_DIR, file);
+      try {
+        const { mtimeMs } = fs.statSync(filePath);
+        if (mtimeMs < cutoff) fs.unlinkSync(filePath);
+      } catch (_) {}
+    });
+  } catch (_) {}
 }
 
 setInterval(cleanupOldClips, 6 * 60 * 60 * 1000);
