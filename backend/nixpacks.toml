@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "yt-dlp", "python3", "fontconfig"]
+nixPkgs = ["ffmpeg", "fontconfig"]
 
 [phases.install]
 cmds = [
