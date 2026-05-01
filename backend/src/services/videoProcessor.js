@@ -1,13 +1,12 @@
 /**
  * Video Processor Service
- * Uses youtube-dl-exec (npm package that bundles yt-dlp binary)
+ * Uses nix-installed yt-dlp (has bundled Python — no system python3 needed)
  * and FFmpeg for audio extraction and clip generation
  */
 
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const youtubeDl = require('youtube-dl-exec');
 
 const TEMP_DIR = path.join(__dirname, '../../temp');
 const CLIPS_DIR = path.join(__dirname, '../../clips');
@@ -16,44 +15,49 @@ const CLIPS_DIR = path.join(__dirname, '../../clips');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// ─── Ensure python3 is accessible at /usr/bin/python3 ─────────────────────────
-// youtube-dl-exec's yt-dlp binary uses /usr/bin/env python3 as shebang
-// On Railway/Nix the python3 binary is in a different path — we fix it here
-(function ensurePython3() {
-  try {
-    execSync('/usr/bin/python3 --version', { stdio: 'pipe' });
-  } catch {
-    try {
-      const python3Path = execSync('which python3', { stdio: 'pipe' }).toString().trim();
-      if (python3Path && python3Path !== '/usr/bin/python3') {
-        try {
-          execSync(`ln -sf ${python3Path} /usr/bin/python3`, { stdio: 'pipe' });
-          console.log(`Linked python3: ${python3Path} → /usr/bin/python3`);
-        } catch (_) {
-          // If we can't symlink (permissions), try local bin
-          try {
-            execSync(`ln -sf ${python3Path} /usr/local/bin/python3`, { stdio: 'pipe' });
-          } catch (_) {}
-        }
-      }
-    } catch (_) {
-      console.warn('python3 not found — yt-dlp may fail');
+// ─── Find yt-dlp binary path at startup ───────────────────────────────────────
+// Nix installs yt-dlp to /nix/store/xxx/bin/yt-dlp — find it dynamically
+let YT_DLP_PATH = 'yt-dlp';
+const POSSIBLE_PATHS = [
+  '/usr/local/bin/yt-dlp',
+  '/usr/bin/yt-dlp',
+  '/nix/var/nix/profiles/default/bin/yt-dlp',
+  '/root/.nix-profile/bin/yt-dlp',
+];
+
+try {
+  const whichResult = execSync('which yt-dlp 2>/dev/null || find /nix -name "yt-dlp" -type f 2>/dev/null | head -1', {
+    stdio: 'pipe',
+  }).toString().trim();
+  if (whichResult) {
+    YT_DLP_PATH = whichResult.split('\n')[0].trim();
+    console.log(`✅ yt-dlp found at: ${YT_DLP_PATH}`);
+  }
+} catch {
+  // Try known paths
+  for (const p of POSSIBLE_PATHS) {
+    if (fs.existsSync(p)) {
+      YT_DLP_PATH = p;
+      console.log(`✅ yt-dlp found at: ${YT_DLP_PATH}`);
+      break;
     }
   }
-})();
+}
 
 /**
- * Run FFmpeg as a child process
+ * Run a child process and return stdout/stderr as a promise
  */
-function runFFmpeg(args) {
+function runProcess(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', args);
+    const proc = spawn(command, args, options);
+    let stdout = '';
     let stderr = '';
+    if (proc.stdout) proc.stdout.on('data', d => (stdout += d));
     if (proc.stderr) proc.stderr.on('data', d => (stderr += d));
-    proc.on('error', err => reject(new Error(`ffmpeg not found: ${err.message}. Install ffmpeg.`)));
+    proc.on('error', err => reject(new Error(`${command} not found: ${err.message}`)));
     proc.on('close', code => {
-      if (code !== 0) reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-500)}`));
-      else resolve();
+      if (code !== 0) reject(new Error(`${command} exited ${code}: ${stderr.slice(-500)}`));
+      else resolve({ stdout, stderr });
     });
   });
 }
@@ -62,12 +66,14 @@ function runFFmpeg(args) {
  * Fetch video metadata without downloading
  */
 async function getVideoInfo(url) {
-  const info = await youtubeDl(url, {
-    dumpSingleJson: true,
-    noWarnings: true,
-    noPlaylist: true,
-  });
+  const { stdout } = await runProcess(YT_DLP_PATH, [
+    '--dump-json',
+    '--no-playlist',
+    '--no-warnings',
+    url,
+  ]);
 
+  const info = JSON.parse(stdout.trim());
   return {
     title: info.title,
     duration: info.duration,
@@ -84,15 +90,16 @@ async function downloadAndExtractAudio(url, jobId) {
   const videoPath = path.join(TEMP_DIR, `${jobId}.mp4`);
   const audioPath = path.join(TEMP_DIR, `${jobId}.wav`);
 
-  // ── Step 1: Download via youtube-dl-exec ──────────────────────────────────
-  console.log(`[${jobId}] Downloading video...`);
-  await youtubeDl(url, {
-    output: videoPath,
-    format: 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]',
-    mergeOutputFormat: 'mp4',
-    noPlaylist: true,
-    noWarnings: true,
-  });
+  // ── Step 1: Download video ────────────────────────────────────────────────
+  console.log(`[${jobId}] Downloading video with yt-dlp (${YT_DLP_PATH})...`);
+  await runProcess(YT_DLP_PATH, [
+    '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]',
+    '--merge-output-format', 'mp4',
+    '--no-playlist',
+    '--no-warnings',
+    '-o', videoPath,
+    url,
+  ]);
 
   if (!fs.existsSync(videoPath)) {
     throw new Error('Video download failed — output file not found');
@@ -100,7 +107,7 @@ async function downloadAndExtractAudio(url, jobId) {
 
   // ── Step 2: Extract audio ─────────────────────────────────────────────────
   console.log(`[${jobId}] Extracting audio...`);
-  await runFFmpeg([
+  await runProcess('ffmpeg', [
     '-i', videoPath,
     '-vn',
     '-acodec', 'pcm_s16le',
@@ -132,8 +139,6 @@ async function generateClipVideo(videoPath, startTime, endTime, srtContent, font
   };
   const fontName = fontMap[font] || 'Montserrat';
 
-  let ffmpegArgs;
-
   if (srtContent && srtContent.trim()) {
     const srtPath = path.join(TEMP_DIR, `${clipId}.srt`);
     fs.writeFileSync(srtPath, srtContent, 'utf-8');
@@ -151,28 +156,26 @@ async function generateClipVideo(videoPath, startTime, endTime, srtContent, font
       `Alignment=2'`,
     ].join(':');
 
-    ffmpegArgs = [
-      '-ss', String(startTime),
-      '-i', videoPath,
-      '-t', String(duration),
-      '-vf', subtitleFilter,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '22',
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-movflags', '+faststart',
-      '-y',
-      outputPath,
-    ];
-
     try {
-      await runFFmpeg(ffmpegArgs);
+      await runProcess('ffmpeg', [
+        '-ss', String(startTime),
+        '-i', videoPath,
+        '-t', String(duration),
+        '-vf', subtitleFilter,
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '22',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        '-y',
+        outputPath,
+      ]);
     } finally {
       try { fs.unlinkSync(srtPath); } catch (_) {}
     }
   } else {
-    await runFFmpeg([
+    await runProcess('ffmpeg', [
       '-ss', String(startTime),
       '-i', videoPath,
       '-t', String(duration),
@@ -194,12 +197,11 @@ async function generateClipVideo(videoPath, startTime, endTime, srtContent, font
  * Delete temp files for a job
  */
 function cleanupJob(jobId) {
-  const files = [
+  [
     path.join(TEMP_DIR, `${jobId}.mp4`),
     path.join(TEMP_DIR, `${jobId}.wav`),
     path.join(TEMP_DIR, `${jobId}.srt`),
-  ];
-  files.forEach(f => {
+  ].forEach(f => {
     try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {}
   });
 }
@@ -208,10 +210,9 @@ function cleanupOldClips() {
   const cutoff = Date.now() - 48 * 60 * 60 * 1000;
   try {
     fs.readdirSync(CLIPS_DIR).forEach(file => {
-      const filePath = path.join(CLIPS_DIR, file);
+      const fp = path.join(CLIPS_DIR, file);
       try {
-        const { mtimeMs } = fs.statSync(filePath);
-        if (mtimeMs < cutoff) fs.unlinkSync(filePath);
+        if (fs.statSync(fp).mtimeMs < cutoff) fs.unlinkSync(fp);
       } catch (_) {}
     });
   } catch (_) {}
