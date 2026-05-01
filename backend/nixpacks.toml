@@ -11,6 +11,7 @@ cmds = [
   "curl -L 'https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf' -o /usr/share/fonts/custom/Poppins-Bold.ttf",
   "curl -L 'https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf' -o /usr/share/fonts/custom/Anton-Regular.ttf",
   "fc-cache -fv"
+  
 ]
 
 [start]
