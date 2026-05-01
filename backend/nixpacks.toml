@@ -4,8 +4,8 @@ nixPkgs = ["ffmpeg", "yt-dlp", "fontconfig"]
 [phases.install]
 cmds = [
   "npm install",
-  "echo 'yt-dlp path:' && which yt-dlp && yt-dlp --version"
+  "echo '=== Build Check ===' && which yt-dlp && yt-dlp --version && which ffmpeg && echo '=================='"
 ]
 
 [start]
-cmd = "node src/index.js"
+cmd = "sh start.sh"
