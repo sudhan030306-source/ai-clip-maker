@@ -3,6 +3,24 @@
  * Express.js API server handling video processing pipeline
  */
 
+// ─── Auto-install yt-dlp at startup if not found ──────────────────────────────
+const { execSync } = require('child_process');
+try {
+  execSync('which yt-dlp');
+  console.log('yt-dlp already installed');
+} catch {
+  console.log('Installing yt-dlp...');
+  try {
+    execSync(
+      'curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp',
+      { stdio: 'inherit' }
+    );
+    console.log('yt-dlp installed successfully');
+  } catch (e) {
+    console.error('Failed to install yt-dlp:', e.message);
+  }
+}
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -77,7 +95,7 @@ app.use((req, res) => {
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n🚀 AI Viral Clip Extractor Backend`);
+  console.log(`\n AI Viral Clip Extractor Backend`);
   console.log(`   Running on http://localhost:${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   Frontend: ${process.env.FRONTEND_URL}\n`);
