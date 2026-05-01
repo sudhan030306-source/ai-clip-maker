@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export default async function HomePage() {
+  // Next.js 15 requires await before cookies()
   const cookieStore = await cookies()
 
   const supabase = createServerClient(
@@ -10,18 +11,12 @@ export default async function HomePage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set() {},      // required for type compatibility
-        remove() {},   // required for type compatibility
+        get: (name: string) => cookieStore.get(name)?.value,
       },
     }
   )
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const { data: { session } } = await supabase.auth.getSession()
 
   if (session) {
     redirect('/dashboard')
