@@ -3,22 +3,33 @@
  * Express.js API server handling video processing pipeline
  */
 
-// ─── Auto-install yt-dlp at startup if not found ──────────────────────────────
+// ─── Auto-install yt-dlp at startup ───────────────────────────────────────────
 const { execSync } = require('child_process');
+
+function installYtDlp() {
+  // Method 1: Try pip3 (most reliable on Railway)
+  try {
+    execSync('pip3 install -q yt-dlp', { stdio: 'inherit' });
+    console.log('yt-dlp installed via pip3');
+    return;
+  } catch (_) {}
+
+  // Method 2: Try pip
+  try {
+    execSync('pip install -q yt-dlp', { stdio: 'inherit' });
+    console.log('yt-dlp installed via pip');
+    return;
+  } catch (_) {}
+
+  console.error('Could not install yt-dlp — all methods failed');
+}
+
 try {
-  execSync('which yt-dlp');
-  console.log('yt-dlp already installed');
+  execSync('yt-dlp --version', { stdio: 'pipe' });
+  console.log('yt-dlp already available');
 } catch {
   console.log('Installing yt-dlp...');
-  try {
-    execSync(
-      'curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp',
-      { stdio: 'inherit' }
-    );
-    console.log('yt-dlp installed successfully');
-  } catch (e) {
-    console.error('Failed to install yt-dlp:', e.message);
-  }
+  installYtDlp();
 }
 
 require('dotenv').config();
@@ -61,7 +72,6 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // ─── Static Files (Generated Clips) ──────────────────────────────────────────
-// Serve clips directory for downloads
 app.use('/clips', express.static(CLIPS_DIR, {
   setHeaders: (res) => {
     res.setHeader('Content-Disposition', 'attachment');
@@ -95,7 +105,7 @@ app.use((req, res) => {
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n AI Viral Clip Extractor Backend`);
+  console.log(`\n🚀 AI Viral Clip Extractor Backend`);
   console.log(`   Running on http://localhost:${PORT}`);
   console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   Frontend: ${process.env.FRONTEND_URL}\n`);
