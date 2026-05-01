@@ -3,35 +3,6 @@
  * Express.js API server handling video processing pipeline
  */
 
-// ─── Auto-install yt-dlp at startup ───────────────────────────────────────────
-const { execSync } = require('child_process');
-
-function installYtDlp() {
-  // Method 1: Try pip3 (most reliable on Railway)
-  try {
-    execSync('pip3 install -q yt-dlp', { stdio: 'inherit' });
-    console.log('yt-dlp installed via pip3');
-    return;
-  } catch (_) {}
-
-  // Method 2: Try pip
-  try {
-    execSync('pip install -q yt-dlp', { stdio: 'inherit' });
-    console.log('yt-dlp installed via pip');
-    return;
-  } catch (_) {}
-
-  console.error('Could not install yt-dlp — all methods failed');
-}
-
-try {
-  execSync('yt-dlp --version', { stdio: 'pipe' });
-  console.log('yt-dlp already available');
-} catch {
-  console.log('Installing yt-dlp...');
-  installYtDlp();
-}
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
